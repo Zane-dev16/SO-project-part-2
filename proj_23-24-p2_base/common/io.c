@@ -77,3 +77,17 @@ int print_str(int fd, const char *str) {
 
   return 0;
 }
+
+int print_pipe_name(int fd, const char *str) {
+  size_t len = strlen(str);
+  while (len > 0) {
+    ssize_t written = write(fd, str, len);
+    if (written == -1) {
+      return 1;
+    }
+    str += (size_t)written;
+    len -= (size_t)written;
+  }
+
+  return 0;
+}

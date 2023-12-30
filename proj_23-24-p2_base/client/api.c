@@ -5,17 +5,32 @@
 #include <string.h>
 #include <stdio.h>
 #include "common/io.h"
+#include "common/constants.h"
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
   int server_pipe_fd = open(server_pipe_path, O_WRONLY);
   if (server_pipe_fd == -1) {
-    fprintf(stderr, "[ERR]: open failed: %s\n");
+    fprintf(stderr, "open failed\n");
     return 1;
   }
+  char req_pipe_message[20];
+  strcpy(req_pipe_message, req_pipe_path);
   char resp_pipe_message[20];
   strcpy(resp_pipe_message, resp_pipe_path);
 
-  print_str(server_pipe_fd, "1");
+  if (print_str(server_pipe_fd, "1")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if(print_pipe_name(server_pipe_fd, req_pipe_message)) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if(print_pipe_name(server_pipe_fd, resp_pipe_message)) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+
   return 0;
 }
 

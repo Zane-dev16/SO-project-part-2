@@ -10,8 +10,6 @@
 #include "common/constants.h"
 #include "common/io.h"
 #include "operations.h"
-#define OP_SETUP '1'
-#define OP_QUIT '2'
 
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
@@ -52,24 +50,38 @@ int main(int argc, char* argv[]) {
       exit(EXIT_FAILURE);
   }
 
+  char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
+  char res_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
   int server_pipe_fd = open(server_pipe_path, O_RDONLY);
-
   //TODO: create worker threads
   while (1) {
     char op_code[1];
 
     ssize_t ret = read(server_pipe_fd, op_code, 1);
     if (ret == 0) {
-        // ret == 0 indicates EOF
+        printf("file ended\n");
         return 0;
     } else if (ret == -1) {
         // ret == -1 indicates error
-        fprintf(stderr, "[ERR]: read failed: %s\n", strerror(errno));
+        fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
+    char buf[5];
     switch (op_code[0]) {
       case OP_SETUP:
-        printf("we got it");
+        
+        printf("in\n");
+
+        if (read(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE) == -1) {
+          fprintf(stderr, "req pipe name reading failed\n");
+          return 1;
+        }
+        printf("%s", req_pipe_names[0]);
+        if (read(server_pipe_fd, res_pipe_names[0], FIFO_NAME_SIZE) == -1) {
+          fprintf(stderr, "req pipe name reading failed\n");
+          return 1;
+        }
+        printf("%s", res_pipe_names[0]);
         break;
       case OP_QUIT:
         printf("quit");
