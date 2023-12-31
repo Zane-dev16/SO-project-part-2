@@ -11,10 +11,13 @@
 #include "common/io.h"
 #include "operations.h"
 
+char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
+char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
+
 void unlink_fifo(const char *fifo_name) {
     // Unlink existing FIFO
     if (unlink(fifo_name) != 0 && errno != ENOENT) {
-        fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", fifo_name, strerror(errno));
+        fprintf(stderr, "[ERR]: unlink failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
@@ -31,10 +34,9 @@ void create_fifo(const char *fifo_name) {
 }
 
 void process_client(int req_pipe_fd, int resp_pipe_fd) {
-  printf("reading\n");
-  while (1) {
+  int fifo_is_open = 1;
+  while (fifo_is_open) {
     char op_code[2];
-    printf("reading\n");
     ssize_t ret = read(req_pipe_fd, op_code, 1);
     if (ret == 0) {
       printf("end of file\n");
@@ -45,8 +47,18 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
-    printf("%c\n", op_code[0]);
+
+    switch (op_code[0]) {
+      case OP_QUIT:
+        fifo_is_open = 0;
+        break;
+      default:
+        fprintf(stderr, "Invalid op code: %c\n", op_code[0]);
+        break;
+    }
   }
+  unlink_fifo(req_pipe_names[0]);
+  unlink_fifo(resp_pipe_names[0]);
 }
 
 int main(int argc, char* argv[]) {
@@ -77,8 +89,6 @@ int main(int argc, char* argv[]) {
 
   create_fifo(server_pipe_path);
 
-  char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
-  char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
   int server_pipe_fd = open(server_pipe_path, O_RDONLY);
   if (server_pipe_fd == -1) {
     fprintf(stderr, "Failed to open file\n");
@@ -120,7 +130,7 @@ int main(int argc, char* argv[]) {
 
       printf("opening\n");
       int resp_pipe_fd = open(resp_pipe_names[0], O_WRONLY);
-      printf("openeeeeed\n");
+      printf("opened\n");
 
       if (resp_pipe_fd == -1) {
         fprintf(stderr, "Failed to open file\n");
