@@ -11,6 +11,25 @@
 #include "common/io.h"
 #include "operations.h"
 
+void unlink_fifo(const char *fifo_name) {
+    // Unlink existing FIFO
+    if (unlink(fifo_name) != 0 && errno != ENOENT) {
+        fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", fifo_name, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+void create_fifo(const char *fifo_name) {
+    // Unlink existing FIFO
+    unlink_fifo(fifo_name);
+
+    // Create new FIFO
+    if (mkfifo(fifo_name, 0640) != 0) {
+        fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "Usage: %s\n <pipe_path> [delay]\n", argv[0]);
@@ -37,22 +56,15 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // Remove server FIFO if it already exists
-  if (unlink(server_pipe_path) != 0 && errno != ENOENT) {
-    fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", server_pipe_path,
-            strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  // Create server FIFO
-  if (mkfifo(server_pipe_path, 0640) != 0) {
-      fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
-      exit(EXIT_FAILURE);
-  }
+  create_fifo(server_pipe_path);
 
   char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
-  char res_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
+  char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
   int server_pipe_fd = open(server_pipe_path, O_RDONLY);
+  if (server_pipe_fd == -1) {
+    fprintf(stderr, "Failed to open file\n");
+    return 1;
+  }
   //TODO: create worker threads
   while (1) {
     char op_code[2];
@@ -73,31 +85,34 @@ int main(int argc, char* argv[]) {
           fprintf(stderr, "req pipe name reading failed\n");
           return 1;
         }
-        if (read_pipe(server_pipe_fd, res_pipe_names[0], FIFO_NAME_SIZE)) {
+        create_fifo(req_pipe_names[0]);
+
+        if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
           fprintf(stderr, "res pipe name reading failed\n");
           return 1;
         }
-        if (unlink(req_pipe_names[0]) != 0 && errno != ENOENT) {
-          fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", server_pipe_path, strerror(errno));
-          exit(EXIT_FAILURE);
+        create_fifo(resp_pipe_names[0]);
+        printf("opening\n");
+        int req_pipe_fd = open(req_pipe_names[0], O_RDONLY);
+        printf("opened\n");
+        if (req_pipe_fd == -1) {
+          fprintf(stderr, "Failed to open file\n");
+          return 1;
         }
-        if (mkfifo(req_pipe_names[0], 0640) != 0) {
-          fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
-          exit(EXIT_FAILURE);
-        }
-        if (unlink(res_pipe_names[0]) != 0 && errno != ENOENT) {
-          fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", server_pipe_path, strerror(errno));
-          exit(EXIT_FAILURE);
-        }
-        if (mkfifo(res_pipe_names[0], 0640) != 0) {
-          fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
-          exit(EXIT_FAILURE);
+
+        printf("opening\n");
+        int resp_pipe_fd = open(resp_pipe_names[0], O_WRONLY);
+        printf("opened\n");
+        if (resp_pipe_fd == -1) {
+          fprintf(stderr, "Failed to open file\n");
+          return 1;
         }
         break;
       }
 
       case OP_QUIT:
-        printf("quit");
+        unlink_fifo(req_pipe_names[0]);
+        unlink_fifo(resp_pipe_names[0]);
         break;
       default:
         printf("%c", op_code[0]);

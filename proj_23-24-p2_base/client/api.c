@@ -7,6 +7,9 @@
 #include "common/io.h"
 #include "common/constants.h"
 
+int req_pipe_fd;
+int resp_pipe_fd;
+
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
   int server_pipe_fd = open(server_pipe_path, O_WRONLY);
   if (server_pipe_fd == -1) {
@@ -18,17 +21,33 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
-  sleep(1);
 
   if(print_pipe_name(server_pipe_fd, req_pipe_path)) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
-  sleep(1);
+
+
   if(print_pipe_name(server_pipe_fd, resp_pipe_path)) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+
+  sleep(1);
+
+  req_pipe_fd = open(req_pipe_path, O_WRONLY);
+  if (req_pipe_fd == -1) {
+    fprintf(stderr, "Failed to open input file. Path: %s\n", req_pipe_path);
+    return 1;
+  }
+  printf("open1\n");
+
+  resp_pipe_fd = open(resp_pipe_path, O_RDONLY);
+  if (resp_pipe_fd == -1) {
+    fprintf(stderr, "Failed to open file\n");
+    return 1;
+  }
+  printf("open2\n");
 
   return 0;
 }
