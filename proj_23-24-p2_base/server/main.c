@@ -30,6 +30,25 @@ void create_fifo(const char *fifo_name) {
     }
 }
 
+void process_client(int req_pipe_fd, int resp_pipe_fd) {
+  printf("reading\n");
+  while (1) {
+    char op_code[2];
+    printf("reading\n");
+    ssize_t ret = read(req_pipe_fd, op_code, 1);
+    if (ret == 0) {
+      printf("end of file\n");
+      break;
+    }
+    if (ret == -1) {
+        // ret == -1 indicates error
+        fprintf(stderr, "read failed\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("%c\n", op_code[0]);
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "Usage: %s\n <pipe_path> [delay]\n", argv[0]);
@@ -79,46 +98,40 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    switch (op_code[0]) {
-      case OP_SETUP: {
-        if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
-          fprintf(stderr, "req pipe name reading failed\n");
-          return 1;
-        }
-        create_fifo(req_pipe_names[0]);
+    if (op_code[0] == OP_SETUP) {
+      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
+        fprintf(stderr, "req pipe name reading failed\n");
+        return 1;
+      }
+      create_fifo(req_pipe_names[0]);
 
-        if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
-          fprintf(stderr, "res pipe name reading failed\n");
-          return 1;
-        }
-        create_fifo(resp_pipe_names[0]);
-        printf("opening\n");
-        int req_pipe_fd = open(req_pipe_names[0], O_RDONLY);
-        printf("opened\n");
-        if (req_pipe_fd == -1) {
-          fprintf(stderr, "Failed to open file\n");
-          return 1;
-        }
-
-        printf("opening\n");
-        int resp_pipe_fd = open(resp_pipe_names[0], O_WRONLY);
-        printf("opened\n");
-        if (resp_pipe_fd == -1) {
-          fprintf(stderr, "Failed to open file\n");
-          return 1;
-        }
-        break;
+      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
+        fprintf(stderr, "res pipe name reading failed\n");
+        return 1;
+      }
+      create_fifo(resp_pipe_names[0]);
+      printf("opening\n");
+      int req_pipe_fd = open(req_pipe_names[0], O_RDONLY);
+      printf("opened\n");
+      if (req_pipe_fd == -1) {
+        fprintf(stderr, "Failed to open file\n");
+        return 1;
       }
 
-      case OP_QUIT:
-        unlink_fifo(req_pipe_names[0]);
-        unlink_fifo(resp_pipe_names[0]);
-        break;
-      default:
-        printf("%c", op_code[0]);
-        fprintf(stderr, "invalid operation code %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-        break;
+      printf("opening\n");
+      int resp_pipe_fd = open(resp_pipe_names[0], O_WRONLY);
+      printf("openeeeeed\n");
+
+      if (resp_pipe_fd == -1) {
+        fprintf(stderr, "Failed to open file\n");
+        return 1;
+      }
+      process_client(req_pipe_fd, resp_pipe_fd);
+    }
+    else {
+      printf("%c", op_code[0]);
+      fprintf(stderr, "invalid operation code %s\n", strerror(errno));
+      exit(EXIT_FAILURE);
     }
   }
 

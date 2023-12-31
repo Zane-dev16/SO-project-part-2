@@ -53,8 +53,12 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 }
 
 int ems_quit(void) { 
+  if (print_str(req_pipe_fd, "2")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
   //TODO: close pipes
-  return 1;
+  return 0;
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
