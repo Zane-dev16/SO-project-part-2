@@ -50,7 +50,20 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
 
     switch (op_code[0]) {
       case OP_QUIT:
+        printf("quitting...\n");
         fifo_is_open = 0;
+        break;
+      case OP_CREATE:
+        printf("in create\n");
+        break;
+      case OP_RESERVE:
+        printf("in reserve\n");
+        break;
+      case OP_SHOW:
+        printf("in show\n");
+        break;
+      case OP_LIST:
+        printf("in list\n");
         break;
       default:
         fprintf(stderr, "Invalid op code: %c\n", op_code[0]);

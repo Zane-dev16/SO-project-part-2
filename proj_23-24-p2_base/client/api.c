@@ -62,21 +62,33 @@ int ems_quit(void) {
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
-  //TODO: send create request to the server (through the request pipe) and wait for the response (through the response pipe)
-  return 1;
+  if (print_str(req_pipe_fd, "3")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  return 0;
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
-  //TODO: send reserve request to the server (through the request pipe) and wait for the response (through the response pipe)
-  return 1;
+  if (print_str(req_pipe_fd, "4")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  return 0;
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
-  //TODO: send show request to the server (through the request pipe) and wait for the response (through the response pipe)
-  return 1;
+  if (print_str(req_pipe_fd, "5")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  return 0;
 }
 
 int ems_list_events(int out_fd) {
-  //TODO: send list request to the server (through the request pipe) and wait for the response (through the response pipe)
-  return 1;
+  if (print_str(req_pipe_fd, "6")) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  return 0;
 }
