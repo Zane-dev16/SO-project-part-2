@@ -1,6 +1,9 @@
 #ifndef COMMON_IO_H
 #define COMMON_IO_H
 
+#include <unistd.h>
+
+
 /// Parses an unsigned integer from the given file descriptor.
 /// @param fd The file descriptor to read from.
 /// @param value Pointer to the variable to store the value in.
@@ -21,5 +24,7 @@ int print_uint(int fd, unsigned int value);
 int print_str(int fd, const char *str);
 
 int print_pipe_name(int fd, const char *str);
+
+int read_pipe(int fd, char *buffer, size_t num_chars);
 
 #endif  // COMMON_IO_H

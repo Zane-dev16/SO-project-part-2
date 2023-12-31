@@ -1,9 +1,11 @@
 #include "io.h"
+#include "constants.h"
 
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 int parse_uint(int fd, unsigned int *value, char *next) {
   char buf[16];
@@ -68,26 +70,60 @@ int print_str(int fd, const char *str) {
   while (len > 0) {
     ssize_t written = write(fd, str, len);
     if (written == -1) {
+      printf("wrinting failed");
       return 1;
     }
-
     str += (size_t)written;
     len -= (size_t)written;
   }
-
   return 0;
 }
 
 int print_pipe_name(int fd, const char *str) {
   size_t len = strlen(str);
-  while (len > 0) {
-    ssize_t written = write(fd, str, len);
-    if (written == -1) {
+
+  // Ensure that the input string is shorter than 20 characters
+  if (len >= 20) {
+    printf("Input string must be shorter than 20 characters\n");
+    return 1;
+  }
+
+  // Write the input string
+  ssize_t written = write(fd, str, len);
+  if (written == -1) {
+    printf("Writing failed\n");
+    return 1;
+  }
+
+  // Write the remaining characters (if any) as '\0' to fill up to 20 characters
+  size_t remaining = FIFO_NAME_SIZE - len;
+  for (size_t i = 0; i < remaining; ++i) {
+    char null_char = '\0';
+    ssize_t null_written = write(fd, &null_char, 1);
+    if (null_written == -1) {
+      printf("Writing failed\n");
       return 1;
     }
-    str += (size_t)written;
-    len -= (size_t)written;
   }
 
   return 0;
+}
+
+int read_pipe(int fd, char *buffer, size_t num_chars) {
+    size_t total_read = 0;
+
+    while (total_read < num_chars) {
+        ssize_t bytes_read = read(fd, buffer + total_read, num_chars - total_read);
+
+        if (bytes_read == -1) {
+            fprintf(stderr, "read failed");
+            return 1;  // Read error
+        } else if (bytes_read == 0) {
+            break;  // End of file
+        }
+
+        total_read += bytes_read;
+    }
+
+    return 0;  // Return the total number of characters read
 }

@@ -55,38 +55,52 @@ int main(int argc, char* argv[]) {
   int server_pipe_fd = open(server_pipe_path, O_RDONLY);
   //TODO: create worker threads
   while (1) {
-    char op_code[1];
+    char op_code[2];
 
     ssize_t ret = read(server_pipe_fd, op_code, 1);
     if (ret == 0) {
-        printf("file ended\n");
-        return 0;
-    } else if (ret == -1) {
+      continue;
+    }
+    if (ret == -1) {
         // ret == -1 indicates error
         fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
-    char buf[5];
-    switch (op_code[0]) {
-      case OP_SETUP:
-        
-        printf("in\n");
 
-        if (read(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE) == -1) {
+    switch (op_code[0]) {
+      case OP_SETUP: {
+        if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
           fprintf(stderr, "req pipe name reading failed\n");
           return 1;
         }
-        printf("%s", req_pipe_names[0]);
-        if (read(server_pipe_fd, res_pipe_names[0], FIFO_NAME_SIZE) == -1) {
-          fprintf(stderr, "req pipe name reading failed\n");
+        if (read_pipe(server_pipe_fd, res_pipe_names[0], FIFO_NAME_SIZE)) {
+          fprintf(stderr, "res pipe name reading failed\n");
           return 1;
         }
-        printf("%s", res_pipe_names[0]);
+        if (unlink(req_pipe_names[0]) != 0 && errno != ENOENT) {
+          fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", server_pipe_path, strerror(errno));
+          exit(EXIT_FAILURE);
+        }
+        if (mkfifo(req_pipe_names[0], 0640) != 0) {
+          fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
+          exit(EXIT_FAILURE);
+        }
+        if (unlink(res_pipe_names[0]) != 0 && errno != ENOENT) {
+          fprintf(stderr, "[ERR]: unlink(%s) failed: %s\n", server_pipe_path, strerror(errno));
+          exit(EXIT_FAILURE);
+        }
+        if (mkfifo(res_pipe_names[0], 0640) != 0) {
+          fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
+          exit(EXIT_FAILURE);
+        }
         break;
+      }
+
       case OP_QUIT:
         printf("quit");
         break;
       default:
+        printf("%c", op_code[0]);
         fprintf(stderr, "invalid operation code %s\n", strerror(errno));
         exit(EXIT_FAILURE);
         break;
