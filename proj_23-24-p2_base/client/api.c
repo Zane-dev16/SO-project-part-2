@@ -108,9 +108,11 @@ int ems_show(int out_fd, unsigned int event_id) {
   size_t cols;
   if (read_pipe(resp_pipe_fd, &rows, sizeof(size_t))) {
     fprintf(stderr, "failed reading op show response\n");
+    return 1;
   }
   if (read_pipe(resp_pipe_fd, &cols, sizeof(size_t))) {
     fprintf(stderr, "failed reading op show response\n");
+    return 1;
   }
 
   printf("%d %d \n", rows, cols);
@@ -118,6 +120,7 @@ int ems_show(int out_fd, unsigned int event_id) {
   unsigned int data[cols * rows];
   if (read_pipe(resp_pipe_fd, &data, sizeof(unsigned int) * rows * cols)) {
     fprintf(stderr, "failed reading op show response\n");
+    return 1;
   }
 
   return 0;
