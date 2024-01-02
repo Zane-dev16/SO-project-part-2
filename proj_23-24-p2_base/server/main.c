@@ -19,127 +19,126 @@ char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 int session_id_queue[MAX_SESSION_COUNT];
 int session_count = 0;
+
 pthread_cond_t has_session_cond;
 pthread_cond_t session_max_cond;
 pthread_mutex_t mutex;
 
 void * process_client() {
-  pthread_mutex_lock(&mutex);
-  while (session_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
-  pthread_mutex_unlock(&mutex);
-  int session_id = 0;
-  int client_session_id;
-  int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
-  if (req_pipe_fd == -1) {
-    fprintf(stderr, "Failed to open file\n");
-    exit(EXIT_FAILURE);
-  }
-  int resp_pipe_fd = open(resp_pipe_names[session_id], O_WRONLY);
-  if (resp_pipe_fd == -1) {
-    fprintf(stderr, "Failed to open file\n");
-    exit(EXIT_FAILURE);
-  }
-  if (write_arg(resp_pipe_fd, &session_id, sizeof(int))) {
-    fprintf(stderr, "failed writing session id\n");
-  }
-
-  int fifo_is_open = 1;
-  while (fifo_is_open) {
-    unsigned int event_id;
-    int response;
-    size_t num_rows, num_columns, num_coords;
-    size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
-
-    char op_code;
-    ssize_t ret = read(req_pipe_fd, &op_code, sizeof(char));
-    if (ret == 0) {
-      printf("client no longer accessible\n");
-      break;
-    }
-    if (ret == -1) {
-        // ret == -1 indicates error
-        fprintf(stderr, "read failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (read_pipe(req_pipe_fd, &client_session_id, sizeof(int))) {
-      fprintf(stderr, "failed reading session id\n");
+  while (1) {
+    pthread_mutex_lock(&mutex);
+    while (session_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
+    pthread_mutex_unlock(&mutex);
+    int session_id = 0;
+    int client_session_id;
+    int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
+    if (req_pipe_fd == -1) {
+      fprintf(stderr, "Failed to open file\n");
       exit(EXIT_FAILURE);
     }
-
-    switch (op_code) {
-      case OP_QUIT:
-        printf("quitting\n");
-        fifo_is_open = 0;
-        break;
-      case OP_CREATE:
-        if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
-          fprintf(stderr, "failed reading op create\n");
-        }
-        if (read_pipe(req_pipe_fd, &num_rows, sizeof(size_t))) {
-          fprintf(stderr, "failed reading op create\n");
-        }
-        if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
-          fprintf(stderr, "failed reading op create\n");
-
-        }
-        printf("in create %d %d %d \n", event_id, num_rows, num_columns);
-        response = ems_create(event_id, num_rows, num_columns);
-        if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
-          fprintf(stderr, "failed writing response\n");
-        }
-        break;
-      case OP_RESERVE:
-        if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
-          fprintf(stderr, "failed reading op reserve\n");
-        }
-        if (read_pipe(req_pipe_fd, &num_coords, sizeof(size_t))) {
-          fprintf(stderr, "failed reading op reserve\n");
-        }
-
-        if (read_pipe(req_pipe_fd, xs, sizeof(size_t) * num_coords)) {
-          fprintf(stderr, "failed reading op reserve\n");
-        }
-
-        if (read_pipe(req_pipe_fd, ys, sizeof(size_t) * num_coords)) {
-          fprintf(stderr, "failed reading op reserve\n");
-        }
-
-        printf("in reserve %d %d %d %d", event_id, num_coords, xs[0], ys[0]);
-        response = ems_reserve(event_id, num_coords, xs, ys);
-
-        if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
-          fprintf(stderr, "failed writing response\n");
-        }
-        break;
-      case OP_SHOW:
-        printf("in show");
-        if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
-          fprintf(stderr, "failed reading op show\n");
-        }
-        response = ems_show(resp_pipe_fd, event_id);
-        if (response) {
-          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
-            fprintf(stderr, "failed writing response\n");
-          }
-        }
-        break;
-      case OP_LIST:
-        printf("in list");
-        response = ems_list_events(resp_pipe_fd);
-        if (response) {
-          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
-            fprintf(stderr, "failed writing response\n");
-          }
-        }
-        break;
-      default:
-        fprintf(stderr, "Invalid op code: %c\n", op_code);
-        break;
+    int resp_pipe_fd = open(resp_pipe_names[session_id], O_WRONLY);
+    if (resp_pipe_fd == -1) {
+      fprintf(stderr, "Failed to open file\n");
+      exit(EXIT_FAILURE);
     }
+    if (write_arg(resp_pipe_fd, &session_id, sizeof(int))) {
+      fprintf(stderr, "failed writing session id\n");
+    }
+
+    int fifo_is_open = 1;
+    while (fifo_is_open) {
+      unsigned int event_id;
+      int response;
+      size_t num_rows, num_columns, num_coords;
+      size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
+
+      char op_code;
+      ssize_t ret = read(req_pipe_fd, &op_code, sizeof(char));
+      if (ret == 0) {
+        printf("client no longer accessible\n");
+        break;
+      }
+      if (ret == -1) {
+          // ret == -1 indicates error
+          fprintf(stderr, "read failed\n");
+          exit(EXIT_FAILURE);
+      }
+
+      if (read_pipe(req_pipe_fd, &client_session_id, sizeof(int))) {
+        fprintf(stderr, "failed reading session id\n");
+        exit(EXIT_FAILURE);
+      }
+
+      switch (op_code) {
+        case OP_QUIT:
+          fifo_is_open = 0;
+          break;
+        case OP_CREATE:
+          if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+            fprintf(stderr, "failed reading op create\n");
+          }
+          if (read_pipe(req_pipe_fd, &num_rows, sizeof(size_t))) {
+            fprintf(stderr, "failed reading op create\n");
+          }
+          if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
+            fprintf(stderr, "failed reading op create\n");
+
+          }
+          response = ems_create(event_id, num_rows, num_columns);
+          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+            fprintf(stderr, "failed writing response\n");
+          }
+          break;
+        case OP_RESERVE:
+          if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+            fprintf(stderr, "failed reading op reserve\n");
+          }
+          if (read_pipe(req_pipe_fd, &num_coords, sizeof(size_t))) {
+            fprintf(stderr, "failed reading op reserve\n");
+          }
+
+          if (read_pipe(req_pipe_fd, xs, sizeof(size_t) * num_coords)) {
+            fprintf(stderr, "failed reading op reserve\n");
+          }
+
+          if (read_pipe(req_pipe_fd, ys, sizeof(size_t) * num_coords)) {
+            fprintf(stderr, "failed reading op reserve\n");
+          }
+
+          response = ems_reserve(event_id, num_coords, xs, ys);
+
+          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+            fprintf(stderr, "failed writing response\n");
+          }
+          break;
+        case OP_SHOW:
+          if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+            fprintf(stderr, "failed reading op show\n");
+          }
+          response = ems_show(resp_pipe_fd, event_id);
+          if (response) {
+            if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+              fprintf(stderr, "failed writing response\n");
+            }
+          }
+          break;
+        case OP_LIST:
+          response = ems_list_events(resp_pipe_fd);
+          if (response) {
+            if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+              fprintf(stderr, "failed writing response\n");
+            }
+          }
+          break;
+        default:
+          fprintf(stderr, "Invalid op code: %c\n", op_code);
+          break;
+      }
+    }
+    close(req_pipe_fd);
+    close(resp_pipe_fd);
+    session_count--;
   }
-  int *returnValue = 0;
-  return (void *)returnValue;
 }
 
 int main(int argc, char* argv[]) {
@@ -211,13 +210,10 @@ int main(int argc, char* argv[]) {
         return 1;
       }
       session_count++;
-      printf("signalling");
       pthread_cond_signal(&has_session_cond);
-      printf("after signal");
       pthread_mutex_unlock(&mutex);
     }
     else {
-      printf("%c", op_code);
       fprintf(stderr, "invalid operation code %s\n", strerror(errno));
       exit(EXIT_FAILURE);
     }
