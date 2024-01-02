@@ -198,6 +198,19 @@ int ems_show(int out_fd, unsigned int event_id) {
     return 1;
   }
 
+  if (write_arg(out_fd, &event->rows, sizeof(size_t))) {
+    fprintf(stderr, "write to pipe failed from show\n");
+    return 1;
+  }
+  if (write_arg(out_fd, &event->cols, sizeof(size_t))) {
+    fprintf(stderr, "write to pipe failed from show\n");
+    return 1;
+  }
+  if (write_arg(out_fd, &event->data, sizeof(unsigned int) * (event->rows * event->cols))) {
+    fprintf(stderr, "write to pipe failed from show\n");
+    return 1;
+  }
+/* 
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1; j <= event->cols; j++) {
       char buffer[16];
@@ -224,7 +237,7 @@ int ems_show(int out_fd, unsigned int event_id) {
       return 1;
     }
   }
-
+ */
   pthread_mutex_unlock(&event->mutex);
   return 0;
 }

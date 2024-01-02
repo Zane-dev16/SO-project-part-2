@@ -76,7 +76,8 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
           fprintf(stderr, "failed reading op create\n");
         }
-        printf("in show %d\n", event_id);
+        printf("in show \n");
+        ems_show(resp_pipe_fd, event_id);
         break;
       case OP_LIST:
         printf("in list\n");
