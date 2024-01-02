@@ -49,6 +49,11 @@ void process_client() {
         exit(EXIT_FAILURE);
     }
 
+    if (read_pipe(req_pipe_fd, &client_session_id, sizeof(int))) {
+      fprintf(stderr, "failed reading session id\n");
+      exit(EXIT_FAILURE);
+    }
+
     switch (op_code) {
       case OP_QUIT:
         printf("quitting\n");

@@ -67,6 +67,10 @@ int ems_quit(void) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+  if (write_arg(req_pipe_fd, &session_id, sizeof(int))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
 
   unlink_fifo(req_path);
   unlink_fifo(resp_path);
@@ -78,6 +82,10 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   int response = 0;
 
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &session_id, sizeof(int))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -103,6 +111,10 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   char op_code = OP_RESERVE;
   int response = 0;
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &session_id, sizeof(int))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -136,6 +148,10 @@ int ems_show(int out_fd, unsigned int event_id) {
   int response = 0;
   char op_code = OP_SHOW;
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &session_id, sizeof(int))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -200,6 +216,10 @@ int ems_list_events(int out_fd) {
   int response = 0;
 
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &session_id, sizeof(int))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
