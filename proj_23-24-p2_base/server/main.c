@@ -19,6 +19,7 @@ char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 int session_id_queue[MAX_SESSION_COUNT];
 int session_count = 0;
+int session_states[MAX_SESSION_COUNT];
 
 pthread_cond_t has_session_cond;
 pthread_cond_t session_max_cond;
@@ -26,11 +27,13 @@ pthread_mutex_t mutex;
 
 void * process_client() {
   while (1) {
+    int client_session_id;
+
     pthread_mutex_lock(&mutex);
     while (session_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
+    int session_id = session_id_queue[session_count - 1];
     pthread_mutex_unlock(&mutex);
-    int session_id = 0;
-    int client_session_id;
+
     int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
     if (req_pipe_fd == -1) {
       fprintf(stderr, "Failed to open file\n");
@@ -135,9 +138,12 @@ void * process_client() {
           break;
       }
     }
+    pthread_mutex_lock(&mutex);
+    session_states[session_id] = INACTIVE;
     close(req_pipe_fd);
     close(resp_pipe_fd);
     session_count--;
+    pthread_mutex_unlock(&mutex);
   }
 }
 
@@ -185,6 +191,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
   }
+
+  for (int i = 0 ; i < MAX_SESSION_COUNT ; i++) {
+    session_states[i] = INACTIVE;
+  }
+
   while (1) {
     char op_code;
 
@@ -199,17 +210,29 @@ int main(int argc, char* argv[]) {
 
     if (op_code == OP_SETUP) {
       pthread_mutex_lock(&mutex);
+      int session_id;
+      for (session_id = 0 ; session_id < MAX_SESSION_COUNT ; session_id++) {
+        if (session_states[session_id] == INACTIVE) break;
+      }
 
-      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
+      if (session_id == MAX_SESSION_COUNT) {
+        fprintf(stderr, "cannot activate session");
+        exit(EXIT_FAILURE);
+      }
+
+      session_states[session_id] = ACTIVE;
+      session_id_queue[session_count] = session_id;
+      session_count++;
+
+      if (read_pipe(server_pipe_fd, req_pipe_names[session_id], FIFO_NAME_SIZE)) {
         fprintf(stderr, "req pipe name reading failed\n");
         return 1;
       }
 
-      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
+      if (read_pipe(server_pipe_fd, resp_pipe_names[session_id], FIFO_NAME_SIZE)) {
         fprintf(stderr, "res pipe name reading failed\n");
         return 1;
       }
-      session_count++;
       pthread_cond_signal(&has_session_cond);
       pthread_mutex_unlock(&mutex);
     }
