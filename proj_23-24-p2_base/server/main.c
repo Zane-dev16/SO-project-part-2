@@ -146,6 +146,7 @@ void * process_client() {
     close(req_pipe_fd);
     close(resp_pipe_fd);
     active_session_count--;
+    pthread_cond_signal(&session_max_cond);
     pthread_mutex_unlock(&mutex);
   }
 }
@@ -213,6 +214,7 @@ int main(int argc, char* argv[]) {
 
     if (op_code == OP_SETUP) {
       pthread_mutex_lock(&mutex);
+      while (active_session_count == MAX_SESSION_COUNT) pthread_cond_wait(&has_session_cond, &mutex);   
       int session_id;
       for (session_id = 0 ; session_id < MAX_SESSION_COUNT ; session_id++) {
         if (session_states[session_id] == INACTIVE) break;
