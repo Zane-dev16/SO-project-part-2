@@ -99,6 +99,10 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+  if (write_arg(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
   return 0;
 }
 
