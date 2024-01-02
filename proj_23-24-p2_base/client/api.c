@@ -91,6 +91,26 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+
+  if (write_arg(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+
+  if (write_arg(req_pipe_fd, &num_seats, sizeof(size_t))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+
+  if (write_arg(req_pipe_fd, xs, sizeof(size_t) * num_seats)) {
+      fprintf(stderr, "write to pipe failed\n");
+      return 1;
+  }
+
+  if (write_arg(req_pipe_fd, ys, sizeof(size_t) * num_seats)) {
+      fprintf(stderr, "write to pipe failed\n");
+      return 1;
+  }
   return 0;
 }
 
@@ -121,8 +141,8 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "failed reading op show response\n");
     return 1;
   }
-  for (size_t i = 1; i <= rows; i++) {
-    for (size_t j = 1; j <= cols; j++) {
+  for (size_t i = 0; i < rows; i++) {
+    for (size_t j = 0; j < cols; j++) {
       char buffer[16];
       sprintf(buffer, "%u", data[i * cols + j]);
 
@@ -131,7 +151,7 @@ int ems_show(int out_fd, unsigned int event_id) {
         return 1;
       }
 
-      if (j < cols) {
+      if (j < cols - 1) {
         if (print_str(out_fd, " ")) {
           perror("Error writing to file descriptor");
           return 1;
@@ -154,5 +174,41 @@ int ems_list_events(int out_fd) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+
+  size_t num_events;
+  if (read_pipe(resp_pipe_fd, &num_events, sizeof(size_t))) {
+      fprintf(stderr, "failed reading op list response\n");
+      return 1;
+  }
+
+  unsigned int *event_ids = malloc(num_events * sizeof(unsigned int));
+  if (event_ids == NULL) {
+      perror("Memory allocation failed");
+      return 1;
+  }
+
+  if (read_pipe(resp_pipe_fd, event_ids, num_events * sizeof(unsigned int))) {
+      fprintf(stderr, "failed reading op list response\n");
+      free(event_ids);
+      return 1;
+  }
+
+  // Process the received data as needed
+  for (size_t i = 0; i < num_events; i++) {
+    char buff[] = "Event: ";
+    if (print_str(out_fd, buff)) {
+      perror("Error writing to file descriptor");
+      return 1;
+    }
+    char id[16];
+    sprintf(id, "%u\n", event_ids[i]);
+    if (print_str(out_fd, id)) {
+      perror("Error writing to file descriptor");
+      return 1;
+    }
+  }
+  // Free the allocated memory
+  free(event_ids);
+
   return 0;
 }

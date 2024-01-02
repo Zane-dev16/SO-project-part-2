@@ -23,10 +23,8 @@ void unlink_fifo(const char *fifo_name) {
 }
 
 void create_fifo(const char *fifo_name) {
-    // Unlink existing FIFO
     unlink_fifo(fifo_name);
 
-    // Create new FIFO
     if (mkfifo(fifo_name, 0640) != 0) {
         fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -70,7 +68,25 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         ems_create(event_id, num_rows, num_columns);
         break;
       case OP_RESERVE:
-        printf("in reserve\n");
+        if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+          fprintf(stderr, "failed reading op reserve\n");
+        }
+        if (read_pipe(req_pipe_fd, &num_coords, sizeof(size_t))) {
+          fprintf(stderr, "failed reading op reserve\n");
+        }
+
+        if (read_pipe(req_pipe_fd, xs, sizeof(size_t) * num_coords)) {
+          fprintf(stderr, "failed reading op reserve\n");
+        }
+
+        if (read_pipe(req_pipe_fd, ys, sizeof(size_t) * num_coords)) {
+          fprintf(stderr, "failed reading op reserve\n");
+        }
+
+        printf("%d %d %d %d %d %d\n", event_id, num_coords, xs[0], ys[0], xs[1], xs[1]);
+
+        ems_reserve(event_id, num_coords, xs, ys);
+
         break;
       case OP_SHOW:
         if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
@@ -81,6 +97,7 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         break;
       case OP_LIST:
         printf("in list\n");
+        ems_list_events(resp_pipe_fd);
         break;
       default:
         fprintf(stderr, "Invalid op code: %c\n", op_code);
@@ -128,12 +145,11 @@ int main(int argc, char* argv[]) {
   while (1) {
     char op_code;
 
-    ssize_t ret = read(server_pipe_fd, &op_code, sizeof(char));
-    if (ret == 0) {
+    ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
+    if (bytes_read == 0) {
       continue;
     }
-    if (ret == -1) {
-        // ret == -1 indicates error
+    if (bytes_read == -1) {
         fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
