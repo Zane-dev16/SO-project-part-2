@@ -29,4 +29,8 @@ int read_pipe(int fd, void *buffer, size_t num_chars);
 
 int write_arg(int fd, const void *buf, size_t count);
 
+void create_fifo(const char *fifo_name);
+
+void unlink_fifo(const char *fifo_name);
+
 #endif  // COMMON_IO_H

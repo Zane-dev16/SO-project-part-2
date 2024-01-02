@@ -14,31 +14,30 @@
 char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 
-void unlink_fifo(const char *fifo_name) {
-    // Unlink existing FIFO
-    if (unlink(fifo_name) != 0 && errno != ENOENT) {
-        fprintf(stderr, "[ERR]: unlink failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
+void process_client() {
+  int session_id = 0;
+  int client_session_id;
+  int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
+  if (req_pipe_fd == -1) {
+    fprintf(stderr, "Failed to open file\n");
+    exit(EXIT_FAILURE);
+  }
+  int resp_pipe_fd = open(resp_pipe_names[session_id], O_WRONLY);
+  if (resp_pipe_fd == -1) {
+    fprintf(stderr, "Failed to open file\n");
+    exit(EXIT_FAILURE);
+  }
 
-void create_fifo(const char *fifo_name) {
-    unlink_fifo(fifo_name);
-
-    if (mkfifo(fifo_name, 0640) != 0) {
-        fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
-
-void process_client(int req_pipe_fd, int resp_pipe_fd) {
   int fifo_is_open = 1;
   while (fifo_is_open) {
-    unsigned int event_id, delay, thr_id;
+    unsigned int event_id;
+    int response;
     size_t num_rows, num_columns, num_coords;
     size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
+    if (write_arg(resp_pipe_fd, &session_id, sizeof(int))) {
+      fprintf(stderr, "failed writing session id\n");
+    }
     char op_code;
-
     ssize_t ret = read(req_pipe_fd, &op_code, sizeof(char));
     if (ret == 0) {
       printf("client no longer accessible\n");
@@ -46,13 +45,13 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
     }
     if (ret == -1) {
         // ret == -1 indicates error
-        fprintf(stderr, "read failed here\n");
+        fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
 
     switch (op_code) {
       case OP_QUIT:
-        printf("quitting...\n");
+        printf("quitting\n");
         fifo_is_open = 0;
         break;
       case OP_CREATE:
@@ -64,8 +63,12 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         }
         if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
           fprintf(stderr, "failed reading op create\n");
+
         }
-        ems_create(event_id, num_rows, num_columns);
+        response = ems_create(event_id, num_rows, num_columns);
+        if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+          fprintf(stderr, "failed writing response\n");
+        }
         break;
       case OP_RESERVE:
         if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
@@ -83,29 +86,35 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
           fprintf(stderr, "failed reading op reserve\n");
         }
 
-        printf("%d %d %d %d %d %d\n", event_id, num_coords, xs[0], ys[0], xs[1], xs[1]);
-
-        ems_reserve(event_id, num_coords, xs, ys);
-
+        response = ems_reserve(event_id, num_coords, xs, ys);
+        if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+          fprintf(stderr, "failed writing response\n");
+        }
         break;
       case OP_SHOW:
         if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
-          fprintf(stderr, "failed reading op create\n");
+          fprintf(stderr, "failed reading op show\n");
         }
-        printf("in show \n");
-        ems_show(resp_pipe_fd, event_id);
+        response = ems_show(resp_pipe_fd, event_id);
+        if (response) {
+          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+            fprintf(stderr, "failed writing response\n");
+          }
+        }
         break;
       case OP_LIST:
-        printf("in list\n");
-        ems_list_events(resp_pipe_fd);
+        response = ems_list_events(resp_pipe_fd);
+        if (response) {
+          if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
+            fprintf(stderr, "failed writing response\n");
+          }
+        }
         break;
       default:
         fprintf(stderr, "Invalid op code: %c\n", op_code);
         break;
     }
   }
-  unlink_fifo(req_pipe_names[0]);
-  unlink_fifo(resp_pipe_names[0]);
 }
 
 int main(int argc, char* argv[]) {
@@ -159,30 +168,13 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "req pipe name reading failed\n");
         return 1;
       }
-      create_fifo(req_pipe_names[0]);
 
       if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
         fprintf(stderr, "res pipe name reading failed\n");
         return 1;
       }
-      create_fifo(resp_pipe_names[0]);
-      printf("opening\n");
-      int req_pipe_fd = open(req_pipe_names[0], O_RDONLY);
-      printf("opened\n");
-      if (req_pipe_fd == -1) {
-        fprintf(stderr, "Failed to open file\n");
-        return 1;
-      }
 
-      printf("opening\n");
-      int resp_pipe_fd = open(resp_pipe_names[0], O_WRONLY);
-      printf("opened\n");
-
-      if (resp_pipe_fd == -1) {
-        fprintf(stderr, "Failed to open file\n");
-        return 1;
-      }
-      process_client(req_pipe_fd, resp_pipe_fd);
+      process_client();
     }
     else {
       printf("%c", op_code);

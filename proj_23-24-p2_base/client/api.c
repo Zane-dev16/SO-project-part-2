@@ -10,8 +10,14 @@
 
 int req_pipe_fd;
 int resp_pipe_fd;
+char req_path[FIFO_NAME_SIZE];
+char resp_path[FIFO_NAME_SIZE];
+int session_id;
 
 int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const* server_pipe_path) {
+  strcpy(req_path, req_pipe_path);
+  strcpy(resp_path, resp_pipe_path);
+
   int server_pipe_fd = open(server_pipe_path, O_WRONLY);
   if (server_pipe_fd == -1) {
     fprintf(stderr, "open failed\n");
@@ -24,32 +30,33 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     return 1;
   }
 
+  create_fifo(req_pipe_path);
+  create_fifo(resp_pipe_path);
+
   if(print_pipe_name(server_pipe_fd, req_pipe_path)) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
-
 
   if(print_pipe_name(server_pipe_fd, resp_pipe_path)) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
 
-  sleep(1);
-
   req_pipe_fd = open(req_pipe_path, O_WRONLY);
   if (req_pipe_fd == -1) {
     fprintf(stderr, "Failed to open input file. Path: %s\n", req_pipe_path);
     return 1;
   }
-  printf("open1\n");
 
   resp_pipe_fd = open(resp_pipe_path, O_RDONLY);
   if (resp_pipe_fd == -1) {
     fprintf(stderr, "Failed to open file\n");
     return 1;
   }
-  printf("open2\n");
+  if (read_pipe(resp_pipe_fd, &session_id, sizeof(int))) {
+    return 1;
+  }
 
   return 0;
 }
@@ -60,12 +67,16 @@ int ems_quit(void) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
-  //TODO: close pipes
+
+  unlink_fifo(req_path);
+  unlink_fifo(resp_path);
   return 0;
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   char op_code = OP_CREATE;
+  int response = 0;
+
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
@@ -82,11 +93,15 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
-  return 0;
+  if (read_pipe(resp_pipe_fd, &response, sizeof(int))) {
+    return 1;
+  }
+  return response;
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
   char op_code = OP_RESERVE;
+  int response = 0;
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
@@ -111,10 +126,14 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
       fprintf(stderr, "write to pipe failed\n");
       return 1;
   }
-  return 0;
+  if (read_pipe(resp_pipe_fd, &response, sizeof(int))) {
+    return 1;
+  }
+  return response;
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
+  int response = 0;
   char op_code = OP_SHOW;
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
@@ -123,6 +142,13 @@ int ems_show(int out_fd, unsigned int event_id) {
   if (write_arg(req_pipe_fd, &event_id, sizeof(unsigned int))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
+  }
+
+  if (read_pipe(resp_pipe_fd, &response, sizeof(int))) {
+    return 1;
+  }
+  if (response) {
+    return response;
   }
 
   size_t rows;
@@ -165,17 +191,25 @@ int ems_show(int out_fd, unsigned int event_id) {
     }
   }
   free(data);
-  return 0;
+  return response;
 }
 
 int ems_list_events(int out_fd) {
   char op_code = OP_LIST;
+  size_t num_events;
+  int response = 0;
+
   if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
 
-  size_t num_events;
+  if (read_pipe(resp_pipe_fd, &response, sizeof(int))) {
+    return 1;
+  }
+  if (response) {
+    return response;
+  }
   if (read_pipe(resp_pipe_fd, &num_events, sizeof(size_t))) {
       fprintf(stderr, "failed reading op list response\n");
       return 1;
@@ -210,5 +244,5 @@ int ems_list_events(int out_fd) {
   // Free the allocated memory
   free(event_ids);
 
-  return 0;
+  return response;
 }

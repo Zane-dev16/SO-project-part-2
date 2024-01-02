@@ -174,6 +174,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
+  int response = 0;
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -197,25 +198,25 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "Error locking mutex\n");
     return 1;
   }
-
+  if (write_arg(out_fd, &response, sizeof(int))) {
+    fprintf(stderr, "failed writing response\n");
+  }
   if (write_arg(out_fd, &event->rows, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed from show\n");
-    return 1;
   }
   if (write_arg(out_fd, &event->cols, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed from show\n");
-    return 1;
   }
   if (write_arg(out_fd, event->data, sizeof(unsigned int) * event->rows * event->cols)) {
     fprintf(stderr, "write to pipe failed from show\n");
-    return 1;
   }
   pthread_mutex_unlock(&event->mutex);
   return 0;
 }
 
 int ems_list_events(int out_fd) {
-/*   if (event_list == NULL) {
+  int response = 0;
+  if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
   }
@@ -223,7 +224,7 @@ int ems_list_events(int out_fd) {
   if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
     fprintf(stderr, "Error locking list rwl\n");
     return 1;
-  } */
+  } 
 
   struct ListNode* to = event_list->tail;
   struct ListNode* current = event_list->head;
@@ -235,13 +236,6 @@ int ems_list_events(int out_fd) {
           break;
       }
       current = current->next;
-  }
-
-
-  if (write_arg(out_fd, &num_events, sizeof(size_t))) {
-      perror("Error writing num_events to file descriptor");
-      pthread_rwlock_unlock(&event_list->rwl);
-      return 1;
   }
 
   current = event_list->head;
@@ -291,7 +285,14 @@ int ems_list_events(int out_fd) {
 
     current = current->next;
   }
-
+  if (write_arg(out_fd, &response, sizeof(int))) {
+    fprintf(stderr, "failed writing response\n");
+  }
+  if (write_arg(out_fd, &num_events, sizeof(size_t))) {
+      perror("Error writing num_events to file descriptor");
+      pthread_rwlock_unlock(&event_list->rwl);
+      return 1;
+  }
   if (write_arg(out_fd, event_ids, num_events * sizeof(unsigned int))) {
     perror("Error writing event IDs to file descriptor");
     free(event_ids);

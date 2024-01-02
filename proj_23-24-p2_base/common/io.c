@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 int parse_uint(int fd, unsigned int *value, char *next) {
   char buf[16];
@@ -143,4 +145,21 @@ int read_pipe(int fd, void *buffer, size_t num_chars) {
     }
 
     return 0;  // Return the total number of characters read
+}
+
+void unlink_fifo(const char *fifo_name) {
+    // Unlink existing FIFO
+    if (unlink(fifo_name) != 0 && errno != ENOENT) {
+        fprintf(stderr, "[ERR]: unlink failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+void create_fifo(const char *fifo_name) {
+    unlink_fifo(fifo_name);
+
+    if (mkfifo(fifo_name, 0640) != 0) {
+        fprintf(stderr, "[ERR]: mkfifo failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 }
