@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "common/io.h"
 #include "common/constants.h"
 
@@ -115,14 +116,35 @@ int ems_show(int out_fd, unsigned int event_id) {
     return 1;
   }
 
-  printf("%d %d \n", rows, cols);
-
-  unsigned int data[cols * rows];
-  if (read_pipe(resp_pipe_fd, &data, sizeof(unsigned int) * rows * cols)) {
+  unsigned int *data = calloc(cols * rows, sizeof(unsigned int));
+  if (read_pipe(resp_pipe_fd, data, sizeof(unsigned int) * rows * cols)) {
     fprintf(stderr, "failed reading op show response\n");
     return 1;
   }
+  for (size_t i = 1; i <= rows; i++) {
+    for (size_t j = 1; j <= cols; j++) {
+      char buffer[16];
+      sprintf(buffer, "%u", data[i * cols + j]);
 
+      if (print_str(out_fd, buffer)) {
+        perror("Error writing to file descriptor");
+        return 1;
+      }
+
+      if (j < cols) {
+        if (print_str(out_fd, " ")) {
+          perror("Error writing to file descriptor");
+          return 1;
+        }
+      }
+    }
+
+    if (print_str(out_fd, "\n")) {
+      perror("Error writing to file descriptor");
+      return 1;
+    }
+  }
+  free(data);
   return 0;
 }
 

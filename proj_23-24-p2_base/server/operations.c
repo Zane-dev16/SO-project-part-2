@@ -206,38 +206,11 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "write to pipe failed from show\n");
     return 1;
   }
-  if (write_arg(out_fd, &event->data, sizeof(unsigned int) * (event->rows * event->cols))) {
+  if (write_arg(out_fd, event->data, sizeof(unsigned int) * event->rows * event->cols)) {
     fprintf(stderr, "write to pipe failed from show\n");
     return 1;
   }
-/* 
-  for (size_t i = 1; i <= event->rows; i++) {
-    for (size_t j = 1; j <= event->cols; j++) {
-      char buffer[16];
-      sprintf(buffer, "%u", event->data[seat_index(event, i, j)]);
-
-      if (print_str(out_fd, buffer)) {
-        perror("Error writing to file descriptor");
-        pthread_mutex_unlock(&event->mutex);
-        return 1;
-      }
-
-      if (j < event->cols) {
-        if (print_str(out_fd, " ")) {
-          perror("Error writing to file descriptor");
-          pthread_mutex_unlock(&event->mutex);
-          return 1;
-        }
-      }
-    }
-
-    if (print_str(out_fd, "\n")) {
-      perror("Error writing to file descriptor");
-      pthread_mutex_unlock(&event->mutex);
-      return 1;
-    }
-  }
- */
+  printf("%u\n", event->data[0]);
   pthread_mutex_unlock(&event->mutex);
   return 0;
 }
