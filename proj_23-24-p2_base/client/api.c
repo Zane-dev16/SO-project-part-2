@@ -17,7 +17,8 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     return 1;
   }
 
-  if (print_str(server_pipe_fd, "1")) {
+  char op_code = OP_SETUP;
+  if (write_arg(server_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -53,7 +54,8 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 }
 
 int ems_quit(void) { 
-  if (print_str(req_pipe_fd, "2")) {
+  char op_code = OP_QUIT;
+  if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -62,7 +64,16 @@ int ems_quit(void) {
 }
 
 int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
-  if (print_str(req_pipe_fd, "3")) {
+  char op_code = OP_CREATE;
+  if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &num_rows, sizeof(size_t))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
+  if (write_arg(req_pipe_fd, &num_cols, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -70,7 +81,8 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
-  if (print_str(req_pipe_fd, "4")) {
+  char op_code = OP_RESERVE;
+  if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -78,7 +90,8 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
 }
 
 int ems_show(int out_fd, unsigned int event_id) {
-  if (print_str(req_pipe_fd, "5")) {
+  char op_code = OP_SHOW;
+  if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
@@ -86,7 +99,8 @@ int ems_show(int out_fd, unsigned int event_id) {
 }
 
 int ems_list_events(int out_fd) {
-  if (print_str(req_pipe_fd, "6")) {
+  char op_code = OP_LIST;
+  if (write_arg(req_pipe_fd, &op_code, sizeof(char))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }

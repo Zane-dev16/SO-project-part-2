@@ -25,6 +25,8 @@ int print_str(int fd, const char *str);
 
 int print_pipe_name(int fd, const char *str);
 
-int read_pipe(int fd, char *buffer, size_t num_chars);
+int read_pipe(int fd, void *buffer, size_t num_chars);
+
+int write_arg(int fd, const void *buf, size_t count);
 
 #endif  // COMMON_IO_H

@@ -36,25 +36,35 @@ void create_fifo(const char *fifo_name) {
 void process_client(int req_pipe_fd, int resp_pipe_fd) {
   int fifo_is_open = 1;
   while (fifo_is_open) {
-    char op_code[2];
-    ssize_t ret = read(req_pipe_fd, op_code, 1);
+    unsigned int event_id, delay, thr_id;
+    size_t num_rows, num_columns, num_coords;
+    size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
+    char op_code;
+
+    ssize_t ret = read(req_pipe_fd, &op_code, sizeof(char));
     if (ret == 0) {
-      printf("end of file\n");
+      printf("client no longer accessible\n");
       break;
     }
     if (ret == -1) {
         // ret == -1 indicates error
-        fprintf(stderr, "read failed\n");
+        fprintf(stderr, "read failed here\n");
         exit(EXIT_FAILURE);
     }
 
-    switch (op_code[0]) {
+    switch (op_code) {
       case OP_QUIT:
         printf("quitting...\n");
         fifo_is_open = 0;
         break;
       case OP_CREATE:
-        printf("in create\n");
+        if (read_pipe(req_pipe_fd, &num_rows, sizeof(size_t))) {
+          fprintf(stderr, "failed reading op create\n");
+        }
+        if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
+          fprintf(stderr, "failed reading op create\n");
+        }
+        printf("in create %d %d\n", num_rows, num_columns);
         break;
       case OP_RESERVE:
         printf("in reserve\n");
@@ -66,7 +76,7 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         printf("in list\n");
         break;
       default:
-        fprintf(stderr, "Invalid op code: %c\n", op_code[0]);
+        fprintf(stderr, "Invalid op code: %c\n", op_code);
         break;
     }
   }
@@ -109,9 +119,9 @@ int main(int argc, char* argv[]) {
   }
   //TODO: create worker threads
   while (1) {
-    char op_code[2];
+    char op_code;
 
-    ssize_t ret = read(server_pipe_fd, op_code, 1);
+    ssize_t ret = read(server_pipe_fd, &op_code, sizeof(char));
     if (ret == 0) {
       continue;
     }
@@ -121,14 +131,14 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if (op_code[0] == OP_SETUP) {
-      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
+    if (op_code == OP_SETUP) {
+      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE) == -1) {
         fprintf(stderr, "req pipe name reading failed\n");
         return 1;
       }
       create_fifo(req_pipe_names[0]);
 
-      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
+      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE) == -1) {
         fprintf(stderr, "res pipe name reading failed\n");
         return 1;
       }
@@ -152,7 +162,7 @@ int main(int argc, char* argv[]) {
       process_client(req_pipe_fd, resp_pipe_fd);
     }
     else {
-      printf("%c", op_code[0]);
+      printf("%c", op_code);
       fprintf(stderr, "invalid operation code %s\n", strerror(errno));
       exit(EXIT_FAILURE);
     }

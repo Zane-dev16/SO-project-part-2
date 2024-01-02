@@ -79,6 +79,23 @@ int print_str(int fd, const char *str) {
   return 0;
 }
 
+int write_arg(int fd, const void *buf, size_t count) {
+    size_t bytes_written_total = 0;
+
+    while (bytes_written_total < count) {
+        ssize_t bytes_written = write(fd, (char *)buf + bytes_written_total, count - bytes_written_total);
+
+        if (bytes_written == -1) {
+            fprintf(stderr, "Error writing to FIFO");
+            return 1;
+        }
+
+        bytes_written_total += (size_t)bytes_written;
+    }
+
+    return 0;
+}
+
 int print_pipe_name(int fd, const char *str) {
   size_t len = strlen(str);
 
@@ -109,15 +126,15 @@ int print_pipe_name(int fd, const char *str) {
   return 0;
 }
 
-int read_pipe(int fd, char *buffer, size_t num_chars) {
-    size_t total_read = 0;
+int read_pipe(int fd, void *buffer, size_t num_chars) {
+    ssize_t total_read = 0;
 
     while (total_read < num_chars) {
-        ssize_t bytes_read = read(fd, buffer + total_read, num_chars - total_read);
+        ssize_t bytes_read = read(fd, (char *)buffer + total_read, num_chars - total_read);
 
         if (bytes_read == -1) {
             fprintf(stderr, "read failed");
-            return 1;  // Read error
+            return -1;  // Read error
         } else if (bytes_read == 0) {
             break;  // End of file
         }
@@ -125,5 +142,5 @@ int read_pipe(int fd, char *buffer, size_t num_chars) {
         total_read += bytes_read;
     }
 
-    return 0;  // Return the total number of characters read
+    return total_read;  // Return the total number of characters read
 }
