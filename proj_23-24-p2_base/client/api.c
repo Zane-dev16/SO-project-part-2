@@ -74,6 +74,8 @@ int ems_quit(void) {
 
   unlink_fifo(req_path);
   unlink_fifo(resp_path);
+  close(req_pipe_fd);
+  close(resp_pipe_fd);
   return 0;
 }
 
@@ -177,8 +179,6 @@ int ems_show(int out_fd, unsigned int event_id) {
     fprintf(stderr, "failed reading op show response\n");
     return 1;
   }
-  printf("%d ", rows);
-  printf("%d\n", cols);
 
   unsigned int *data = calloc(cols * rows, sizeof(unsigned int));
   if (read_pipe(resp_pipe_fd, data, sizeof(unsigned int) * rows * cols)) {

@@ -18,7 +18,8 @@
 char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 int session_id_queue[MAX_SESSION_COUNT];
-int session_count = 0;
+int active_session_count = 0;
+int session_request_count = 0;
 int session_states[MAX_SESSION_COUNT];
 
 pthread_cond_t has_session_cond;
@@ -30,8 +31,10 @@ void * process_client() {
     int client_session_id;
 
     pthread_mutex_lock(&mutex);
-    while (session_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
-    int session_id = session_id_queue[session_count - 1];
+    while (session_request_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
+    int session_id = session_id_queue[session_request_count - 1];
+    session_request_count--;
+    active_session_count++;
     pthread_mutex_unlock(&mutex);
 
     int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
@@ -142,7 +145,7 @@ void * process_client() {
     session_states[session_id] = INACTIVE;
     close(req_pipe_fd);
     close(resp_pipe_fd);
-    session_count--;
+    active_session_count--;
     pthread_mutex_unlock(&mutex);
   }
 }
@@ -185,7 +188,7 @@ int main(int argc, char* argv[]) {
   pthread_mutex_init(&mutex, NULL);
   pthread_cond_init(&session_max_cond, NULL);
   pthread_cond_init(&has_session_cond, NULL);
-  for (unsigned int i = 0; i < 1; i++) {
+  for (unsigned int i = 0; i < MAX_SESSION_COUNT; i++) {
     if (pthread_create(&th[i], NULL, process_client, NULL) != 0) {
         fprintf(stderr, "Failed to create thread");
         return 1;
@@ -221,8 +224,8 @@ int main(int argc, char* argv[]) {
       }
 
       session_states[session_id] = ACTIVE;
-      session_id_queue[session_count] = session_id;
-      session_count++;
+      session_id_queue[session_request_count] = session_id;
+      session_request_count++;
 
       if (read_pipe(server_pipe_fd, req_pipe_names[session_id], FIFO_NAME_SIZE)) {
         fprintf(stderr, "req pipe name reading failed\n");
@@ -245,7 +248,7 @@ int main(int argc, char* argv[]) {
   pthread_mutex_destroy(&mutex);
   pthread_cond_destroy(&session_max_cond);
   pthread_cond_destroy(&has_session_cond);
-  for (unsigned int i = 0; i < 1; i++) {
+  for (unsigned int i = 0; i < MAX_SESSION_COUNT; i++) {
     if (pthread_join(th[i], NULL) != 0) {
         fprintf(stderr, "Failed to create thread");
         return 1;
