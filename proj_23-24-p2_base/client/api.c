@@ -69,6 +69,10 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;
   }
+  if (write_arg(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+    fprintf(stderr, "write to pipe failed\n");
+    return 1;
+  }
   if (write_arg(req_pipe_fd, &num_rows, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed\n");
     return 1;

@@ -58,13 +58,16 @@ void process_client(int req_pipe_fd, int resp_pipe_fd) {
         fifo_is_open = 0;
         break;
       case OP_CREATE:
+        if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
+          fprintf(stderr, "failed reading op create\n");
+        }
         if (read_pipe(req_pipe_fd, &num_rows, sizeof(size_t))) {
           fprintf(stderr, "failed reading op create\n");
         }
         if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
           fprintf(stderr, "failed reading op create\n");
         }
-        printf("in create %d %d\n", num_rows, num_columns);
+        ems_create(event_id, num_rows, num_columns);
         break;
       case OP_RESERVE:
         printf("in reserve\n");
@@ -132,13 +135,13 @@ int main(int argc, char* argv[]) {
     }
 
     if (op_code == OP_SETUP) {
-      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE) == -1) {
+      if (read_pipe(server_pipe_fd, req_pipe_names[0], FIFO_NAME_SIZE)) {
         fprintf(stderr, "req pipe name reading failed\n");
         return 1;
       }
       create_fifo(req_pipe_names[0]);
 
-      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE) == -1) {
+      if (read_pipe(server_pipe_fd, resp_pipe_names[0], FIFO_NAME_SIZE)) {
         fprintf(stderr, "res pipe name reading failed\n");
         return 1;
       }
