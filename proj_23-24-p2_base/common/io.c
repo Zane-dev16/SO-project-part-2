@@ -129,7 +129,7 @@ int print_pipe_name(int fd, const char *str) {
 }
 
 int read_pipe(int fd, void *buffer, size_t num_chars) {
-    ssize_t total_read = 0;
+    size_t total_read = 0;
 
     while (total_read < num_chars) {
         ssize_t bytes_read = read(fd, (char *)buffer + total_read, num_chars - total_read);
@@ -141,7 +141,7 @@ int read_pipe(int fd, void *buffer, size_t num_chars) {
             break;  // End of file
         }
 
-        total_read += bytes_read;
+        total_read += (size_t)bytes_read;
     }
 
     return 0;  // Return the total number of characters read

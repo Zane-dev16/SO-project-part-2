@@ -305,3 +305,4 @@ int ems_list_events(int out_fd) {
   pthread_rwlock_unlock(&event_list->rwl);
   return 0;
 }
+

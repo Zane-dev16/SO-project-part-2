@@ -7,10 +7,12 @@
 #include <string.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "common/constants.h"
 #include "common/io.h"
 #include "operations.h"
+
 
 #define ACTIVE 0
 #define INACTIVE 1
@@ -26,9 +28,21 @@ pthread_cond_t has_session_cond;
 pthread_cond_t session_max_cond;
 pthread_mutex_t mutex;
 
+
+void sigusr1_handler(int signo) {
+  // Tratamento do sinal SIGUSR1
+
+}
+
+
 void * process_client() {
   while (1) {
     int client_session_id;
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     pthread_mutex_lock(&mutex);
     while (session_request_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
@@ -201,6 +215,8 @@ int main(int argc, char* argv[]) {
   }
 
   while (1) {
+
+
     char op_code;
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
@@ -208,13 +224,15 @@ int main(int argc, char* argv[]) {
       continue;
     }
     if (bytes_read == -1) {
+        //verificar stderr se for o sinal do erro
+          //continue
         fprintf(stderr, "read failed\n");
         exit(EXIT_FAILURE);
     }
 
     if (op_code == OP_SETUP) {
       pthread_mutex_lock(&mutex);
-      while (active_session_count == MAX_SESSION_COUNT) pthread_cond_wait(&has_session_cond, &mutex);   
+      while (active_session_count == MAX_SESSION_COUNT || session_request_count == MAX_SESSION_COUNT) pthread_cond_wait(&has_session_cond, &mutex);   
       int session_id;
       for (session_id = 0 ; session_id < MAX_SESSION_COUNT ; session_id++) {
         if (session_states[session_id] == INACTIVE) break;
