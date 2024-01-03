@@ -98,36 +98,6 @@ int write_arg(int fd, const void *buf, size_t count) {
     return 0;
 }
 
-int print_pipe_name(int fd, const char *str) {
-  size_t len = strlen(str);
-
-  // Ensure that the input string is shorter than 20 characters
-  if (len >= 20) {
-    printf("Input string must be shorter than 20 characters\n");
-    return 1;
-  }
-
-  // Write the input string
-  ssize_t written = write(fd, str, len);
-  if (written == -1) {
-    printf("Writing failed\n");
-    return 1;
-  }
-
-  // Write the remaining characters (if any) as '\0' to fill up to 20 characters
-  size_t remaining = FIFO_NAME_SIZE - len;
-  for (size_t i = 0; i < remaining; ++i) {
-    char null_char = '\0';
-    ssize_t null_written = write(fd, &null_char, 1);
-    if (null_written == -1) {
-      printf("Writing failed\n");
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
 int read_pipe(int fd, void *buffer, size_t num_chars) {
     size_t total_read = 0;
 

@@ -24,26 +24,30 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
     return 1;
   }
 
-  char op_code = OP_SETUP;
-  if (write_arg(server_pipe_fd, &op_code, sizeof(char))) {
-    fprintf(stderr, "write to pipe failed\n");
-    return 1;
-  }
 
   create_fifo(req_pipe_path);
   create_fifo(resp_pipe_path);
 
-  if(print_pipe_name(server_pipe_fd, req_pipe_path)) {
-    fprintf(stderr, "write to pipe failed\n");
-    return 1;
+
+  char op_code = OP_SETUP;
+  char buffer[81];
+  buffer[0] = op_code;
+
+  strncpy(buffer + 1, req_pipe_path, 40);
+  memset(buffer + 1 + strlen(req_pipe_path), '\0', 40 - strlen(req_pipe_path));
+
+  strncpy(buffer + 41, resp_pipe_path, 40);
+  memset(buffer + 41 + strlen(resp_pipe_path), '\0', 40 - strlen(resp_pipe_path));
+
+  ssize_t bytesWritten = write(server_pipe_fd, buffer, 81);
+  if (bytesWritten == -1) {
+      close(server_pipe_fd); // Close the file descriptor in case of an error
+      return 1;
   }
 
-  if(print_pipe_name(server_pipe_fd, resp_pipe_path)) {
-    fprintf(stderr, "write to pipe failed\n");
-    return 1;
-  }
 
   req_pipe_fd = open(req_pipe_path, O_WRONLY);
+
   if (req_pipe_fd == -1) {
     fprintf(stderr, "Failed to open input file. Path: %s\n", req_pipe_path);
     return 1;
