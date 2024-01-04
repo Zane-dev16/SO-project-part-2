@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
 
   create_fifo(server_pipe_path);
 
-  int server_pipe_fd = open(server_pipe_path, O_RDONLY);
+  int server_pipe_fd = open(server_pipe_path, O_RDWR);
   if (server_pipe_fd == -1) {
     fprintf(stderr, "Failed to open file\n");
     return 1;
