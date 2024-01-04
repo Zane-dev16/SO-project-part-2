@@ -306,3 +306,7 @@ int ems_list_events(int out_fd) {
   return 0;
 }
 
+int show_status() {
+  // implementar a escrita para o std_out do estado atual do programa
+  return 0;
+}

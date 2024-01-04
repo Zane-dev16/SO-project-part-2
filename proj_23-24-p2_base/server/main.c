@@ -28,17 +28,17 @@ pthread_cond_t has_session_cond;
 pthread_cond_t session_max_cond;
 pthread_mutex_t mutex;
 
+volatile sig_atomic_t sigusr1_received = 0;
 
-void sigusr1_handler(int signo) {
-  // Tratamento do sinal SIGUSR1
-
+void sigusr1_handler() {
+  sigusr1_received = 1;
 }
-
 
 void * process_client() {
   while (1) {
     int client_session_id;
 
+    // ignores SIGUSR1 signal
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1);
@@ -166,6 +166,13 @@ void * process_client() {
 }
 
 int main(int argc, char* argv[]) {
+
+  // redefines SIGUSR1 function treatment
+  struct sigaction sa;
+  sa.sa_handler = sigusr1_handler;
+  sa.sa_flags = 0;
+  sigaction(SIGUSR1, &sa, NULL);
+
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "Usage: %s\n <pipe_path> [delay]\n", argv[0]);
     return 1;
@@ -216,18 +223,25 @@ int main(int argc, char* argv[]) {
 
   while (1) {
 
-
     char op_code;
+
+    if (sigusr1_received) {
+      show_status(); // needs implementation
+    }
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
     if (bytes_read == 0) {
       continue;
     }
     if (bytes_read == -1) {
-        //verificar stderr se for o sinal do erro
-          //continue
-        fprintf(stderr, "read failed\n");
-        exit(EXIT_FAILURE);
+      /*
+      if (errno == EINTR) {
+        // show_status
+        // continue
+      }
+      */
+      fprintf(stderr, "read failed\n");
+      exit(EXIT_FAILURE);
     }
 
     if (op_code == OP_SETUP) {
