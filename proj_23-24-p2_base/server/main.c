@@ -46,45 +46,92 @@ void * process_client() {
     sigaddset(&mask, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    pthread_mutex_lock(&mutex);
-    while (session_request_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
+    if (pthread_mutex_lock(&mutex)) {
+      fprintf(stderr, "Lock Error");
+      exit(EXIT_FAILURE);
+    }
+    while (session_request_count == 0) {
+      if (pthread_cond_wait(&has_session_cond, &mutex)) {
+        fprintf(stderr, "Condition Variable Error");
+        exit(EXIT_FAILURE);
+      }
+    }
     int session_id = session_id_queue[consptr]; 
     consptr++; 
     if (consptr == MAX_SESSION_COUNT) consptr = 0;
     session_request_count--;
     active_session_count++;
-    pthread_mutex_unlock(&mutex);
+    if (pthread_mutex_unlock(&mutex)) {
+      fprintf(stderr, "Lock Error");
+      exit(EXIT_FAILURE);
+    }
 
     int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
     if (req_pipe_fd == -1) {
       fprintf(stderr, "Failed to open file\n");
-      pthread_mutex_lock(&mutex);
+      if (pthread_mutex_lock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       session_states[session_id] = INACTIVE;
       active_session_count--;
-      pthread_cond_signal(&session_max_cond);
-      pthread_mutex_unlock(&mutex);
+      if (pthread_cond_signal(&session_max_cond)) {
+        fprintf(stderr, "Condition Variable Error");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_unlock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       continue;
     }
     int resp_pipe_fd = open(resp_pipe_names[session_id], O_WRONLY);
     if (resp_pipe_fd == -1) {
       fprintf(stderr, "Failed to open file\n");
-      close(req_pipe_fd);
-      pthread_mutex_lock(&mutex);
+      if (close(req_pipe_fd)) {
+        fprintf(stderr, "Error closing fd");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_lock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       session_states[session_id] = INACTIVE;
       active_session_count--;
-      pthread_cond_signal(&session_max_cond);
-      pthread_mutex_unlock(&mutex);
+      if (pthread_cond_signal(&session_max_cond)) {
+        fprintf(stderr, "Condition Variable Error");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_unlock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       continue;
     }
     if (write_arg(resp_pipe_fd, &session_id, sizeof(int))) {
       fprintf(stderr, "failed writing session id\n");
-      close(req_pipe_fd);
-      close(resp_pipe_fd);
-      pthread_mutex_lock(&mutex);
+      if (close(req_pipe_fd)) {
+        fprintf(stderr, "Error closing fd");
+        exit(EXIT_FAILURE);
+      }
+      if (close(resp_pipe_fd)) {
+        fprintf(stderr, "Error closing fd");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_lock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       session_states[session_id] = INACTIVE;
       active_session_count--;
-      pthread_cond_signal(&session_max_cond);
-      pthread_mutex_unlock(&mutex);
+      if (pthread_cond_signal(&session_max_cond)) {
+        fprintf(stderr, "Condition Variable Error");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_unlock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
       continue;
     }
 
@@ -194,13 +241,28 @@ void * process_client() {
           break;
       }
     }
-    pthread_mutex_lock(&mutex);
+    if (pthread_mutex_lock(&mutex)) {
+      fprintf(stderr, "Lock Error");
+      exit(EXIT_FAILURE);
+    }
     session_states[session_id] = INACTIVE;
-    close(req_pipe_fd);
-    close(resp_pipe_fd);
+    if (close(req_pipe_fd)) {
+      fprintf(stderr, "Error closing fd");
+      exit(EXIT_FAILURE);
+    }
+    if (close(resp_pipe_fd)) {
+      fprintf(stderr, "Error closing fd");
+      exit(EXIT_FAILURE);
+    }
     active_session_count--;
-    pthread_cond_signal(&session_max_cond);
-    pthread_mutex_unlock(&mutex);
+    if (pthread_cond_signal(&session_max_cond)) {
+      fprintf(stderr, "Condition Variable Error");
+      exit(EXIT_FAILURE);
+    }
+    if (pthread_mutex_unlock(&mutex)) {
+      fprintf(stderr, "Lock Error");
+      exit(EXIT_FAILURE);
+    }
   }
 }
 
@@ -246,9 +308,18 @@ int main(int argc, char* argv[]) {
   }
 
   pthread_t th[MAX_SESSION_COUNT];
-  pthread_mutex_init(&mutex, NULL);
-  pthread_cond_init(&session_max_cond, NULL);
-  pthread_cond_init(&has_session_cond, NULL);
+  if (pthread_mutex_init(&mutex, NULL)) {
+    fprintf(stderr, "Lock Error");
+    exit(EXIT_FAILURE);
+  }
+  if (pthread_cond_init(&session_max_cond, NULL)) {
+    fprintf(stderr, "Condition Variable Error");
+    exit(EXIT_FAILURE);
+  }
+  if (pthread_cond_init(&has_session_cond, NULL)) {
+    fprintf(stderr, "Condition Variable Error");
+    exit(EXIT_FAILURE);
+  }
   for (unsigned int i = 0; i < MAX_SESSION_COUNT; i++) {
     if (pthread_create(&th[i], NULL, process_client, NULL) != 0) {
         fprintf(stderr, "Failed to create thread");
@@ -280,8 +351,16 @@ int main(int argc, char* argv[]) {
     }
 
     if (op_code == OP_SETUP) {
-      pthread_mutex_lock(&mutex);
-      while (active_session_count == MAX_SESSION_COUNT || session_request_count == MAX_SESSION_COUNT) pthread_cond_wait(&has_session_cond, &mutex);   
+      if (pthread_mutex_lock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
+      while (active_session_count == MAX_SESSION_COUNT || session_request_count == MAX_SESSION_COUNT) {
+        if (pthread_cond_wait(&has_session_cond, &mutex)) {
+          fprintf(stderr, "Condition Variable Error");
+          exit(EXIT_FAILURE);
+        }
+      }
       int session_id;
       for (session_id = 0 ; session_id < MAX_SESSION_COUNT ; session_id++) {
         if (session_states[session_id] == INACTIVE) break;
@@ -307,8 +386,14 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "res pipe name reading failed\n");
         return 1;
       }
-      pthread_cond_signal(&has_session_cond);
-      pthread_mutex_unlock(&mutex);
+      if (pthread_cond_signal(&has_session_cond)) {
+        fprintf(stderr, "Condition Variable Error");
+        exit(EXIT_FAILURE);
+      }
+      if (pthread_mutex_unlock(&mutex)) {
+        fprintf(stderr, "Lock Error");
+        exit(EXIT_FAILURE);
+      }
     }
     else {
       fprintf(stderr, "invalid operation code %s\n", strerror(errno));
@@ -316,16 +401,28 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  pthread_mutex_destroy(&mutex);
-  pthread_cond_destroy(&session_max_cond);
-  pthread_cond_destroy(&has_session_cond);
+  if (pthread_mutex_destroy(&mutex)) {
+    fprintf(stderr, "Lock Error");
+    exit(EXIT_FAILURE);
+  }
+  if (pthread_cond_destroy(&session_max_cond)) {
+    fprintf(stderr, "Lock Error");
+    exit(EXIT_FAILURE);
+  }
+  if (pthread_cond_destroy(&has_session_cond)) {
+    fprintf(stderr, "Lock Error");
+    exit(EXIT_FAILURE);
+  }
   for (unsigned int i = 0; i < MAX_SESSION_COUNT; i++) {
     if (pthread_join(th[i], NULL) != 0) {
         fprintf(stderr, "Failed to create thread");
         return 1;
     }
   }
-  close(server_pipe_fd);
+  if (close(server_pipe_fd) == -1) {
+    fprintf(stderr, "Error closing fd");
+    exit(EXIT_FAILURE);
+  }
 
   ems_terminate();
 }

@@ -41,8 +41,11 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   ssize_t bytesWritten = write(server_pipe_fd, buffer, 81);
   if (bytesWritten == -1) {
-      close(server_pipe_fd); // Close the file descriptor in case of an error
-      return 1;
+    if (close(server_pipe_fd)) {
+      fprintf(stderr, "Error closing fd");
+      exit(EXIT_FAILURE);
+    }
+    return 1;
   }
 
 
@@ -78,8 +81,14 @@ int ems_quit(void) {
 
   unlink_fifo(req_path);
   unlink_fifo(resp_path);
-  close(req_pipe_fd);
-  close(resp_pipe_fd);
+  if (close(req_pipe_fd)) {
+    fprintf(stderr, "Error closing fd");
+    exit(EXIT_FAILURE);
+  }
+  if (close(resp_pipe_fd)) {
+    fprintf(stderr, "Error closing fd");
+    exit(EXIT_FAILURE);
+  }
   return 0;
 }
 
@@ -185,6 +194,10 @@ int ems_show(int out_fd, unsigned int event_id) {
   }
 
   unsigned int *data = calloc(cols * rows, sizeof(unsigned int));
+  if (data == NULL) {
+    perror("Error allocating memory");
+    exit(EXIT_FAILURE);
+}
   if (read_pipe(resp_pipe_fd, data, sizeof(unsigned int) * rows * cols)) {
     fprintf(stderr, "failed reading op show response\n");
     return 1;
