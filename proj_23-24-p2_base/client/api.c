@@ -18,16 +18,8 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
   strcpy(req_path, req_pipe_path);
   strcpy(resp_path, resp_pipe_path);
 
-  int server_pipe_fd = open(server_pipe_path, O_WRONLY);
-  if (server_pipe_fd == -1) {
-    fprintf(stderr, "open failed\n");
-    return 1;
-  }
-
-
   create_fifo(req_pipe_path);
   create_fifo(resp_pipe_path);
-
 
   char op_code = OP_SETUP;
   char buffer[81];
@@ -38,16 +30,19 @@ int ems_setup(char const* req_pipe_path, char const* resp_pipe_path, char const*
 
   strncpy(buffer + 41, resp_pipe_path, 40);
   memset(buffer + 41 + strlen(resp_pipe_path), '\0', 40 - strlen(resp_pipe_path));
-
-  ssize_t bytesWritten = write(server_pipe_fd, buffer, 81);
-  if (bytesWritten == -1) {
-    if (close(server_pipe_fd)) {
-      fprintf(stderr, "Error closing fd");
-      exit(EXIT_FAILURE);
-    }
+  int server_pipe_fd = open(server_pipe_path, O_WRONLY);
+  if (server_pipe_fd == -1) {
+    fprintf(stderr, "open failed\n");
     return 1;
   }
-
+  ssize_t bytesWritten = write(server_pipe_fd, buffer, 81);
+  if (close(server_pipe_fd)) {
+    fprintf(stderr, "Error closing fd");
+    exit(EXIT_FAILURE);
+  }
+  if (bytesWritten == -1) {
+    return 1;
+  }
 
   req_pipe_fd = open(req_pipe_path, O_WRONLY);
 
