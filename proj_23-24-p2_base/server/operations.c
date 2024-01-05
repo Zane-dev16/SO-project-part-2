@@ -400,6 +400,7 @@ int show_status() {
   }
 
     if (current == to) {
+      pthread_mutex_unlock(&current->event->mutex);
       break;
     }
     pthread_mutex_unlock(&current->event->mutex);
