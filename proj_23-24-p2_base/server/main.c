@@ -20,6 +20,8 @@
 char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 int session_id_queue[MAX_SESSION_COUNT];
+int consptr = 0;
+int prodptr = 0;
 int active_session_count = 0;
 int session_request_count = 0;
 int session_states[MAX_SESSION_COUNT];
@@ -46,7 +48,9 @@ void * process_client() {
 
     pthread_mutex_lock(&mutex);
     while (session_request_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
-    int session_id = session_id_queue[session_request_count - 1];
+    int session_id = session_id_queue[consptr]; 
+    consptr++; 
+    if (consptr == MAX_SESSION_COUNT) consptr = 0;
     session_request_count--;
     active_session_count++;
     pthread_mutex_unlock(&mutex);
@@ -54,15 +58,34 @@ void * process_client() {
     int req_pipe_fd = open(req_pipe_names[session_id], O_RDONLY);
     if (req_pipe_fd == -1) {
       fprintf(stderr, "Failed to open file\n");
-      exit(EXIT_FAILURE);
+      pthread_mutex_lock(&mutex);
+      session_states[session_id] = INACTIVE;
+      active_session_count--;
+      pthread_cond_signal(&session_max_cond);
+      pthread_mutex_unlock(&mutex);
+      continue;
     }
     int resp_pipe_fd = open(resp_pipe_names[session_id], O_WRONLY);
     if (resp_pipe_fd == -1) {
       fprintf(stderr, "Failed to open file\n");
-      exit(EXIT_FAILURE);
+      close(req_pipe_fd);
+      pthread_mutex_lock(&mutex);
+      session_states[session_id] = INACTIVE;
+      active_session_count--;
+      pthread_cond_signal(&session_max_cond);
+      pthread_mutex_unlock(&mutex);
+      continue;
     }
     if (write_arg(resp_pipe_fd, &session_id, sizeof(int))) {
       fprintf(stderr, "failed writing session id\n");
+      close(req_pipe_fd);
+      close(resp_pipe_fd);
+      pthread_mutex_lock(&mutex);
+      session_states[session_id] = INACTIVE;
+      active_session_count--;
+      pthread_cond_signal(&session_max_cond);
+      pthread_mutex_unlock(&mutex);
+      continue;
     }
 
     int fifo_is_open = 1;
@@ -81,12 +104,12 @@ void * process_client() {
       if (ret == -1) {
           // ret == -1 indicates error
           fprintf(stderr, "read failed\n");
-          exit(EXIT_FAILURE);
+          break;
       }
 
       if (read_pipe(req_pipe_fd, &client_session_id, sizeof(int))) {
         fprintf(stderr, "failed reading session id\n");
-        exit(EXIT_FAILURE);
+        break;
       }
 
       switch (op_code) {
@@ -96,47 +119,59 @@ void * process_client() {
         case OP_CREATE:
           if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
             fprintf(stderr, "failed reading op create\n");
+            fifo_is_open = 0;
           }
           if (read_pipe(req_pipe_fd, &num_rows, sizeof(size_t))) {
             fprintf(stderr, "failed reading op create\n");
+            fifo_is_open = 0;
           }
           if (read_pipe(req_pipe_fd, &num_columns, sizeof(size_t))) {
             fprintf(stderr, "failed reading op create\n");
-
+            fifo_is_open = 0;
           }
           response = ems_create(event_id, num_rows, num_columns);
           if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
             fprintf(stderr, "failed writing response\n");
+            fifo_is_open = 0;
           }
           break;
         case OP_RESERVE:
           if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
             fprintf(stderr, "failed reading op reserve\n");
+            fifo_is_open = 0;
           }
           if (read_pipe(req_pipe_fd, &num_coords, sizeof(size_t))) {
             fprintf(stderr, "failed reading op reserve\n");
+            fifo_is_open = 0;
           }
 
           if (read_pipe(req_pipe_fd, xs, sizeof(size_t) * num_coords)) {
             fprintf(stderr, "failed reading op reserve\n");
+            fifo_is_open = 0;
           }
 
           if (read_pipe(req_pipe_fd, ys, sizeof(size_t) * num_coords)) {
             fprintf(stderr, "failed reading op reserve\n");
+            fifo_is_open = 0;
           }
 
           response = ems_reserve(event_id, num_coords, xs, ys);
 
           if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
             fprintf(stderr, "failed writing response\n");
+            fifo_is_open = 0;
           }
           break;
         case OP_SHOW:
           if (read_pipe(req_pipe_fd, &event_id, sizeof(unsigned int))) {
             fprintf(stderr, "failed reading op show\n");
+            fifo_is_open = 0;
           }
           response = ems_show(resp_pipe_fd, event_id);
-          if (response) {
+          if (response == -1) {
+            fifo_is_open = 0;
+          }
+          if (response == 1) {
             if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
               fprintf(stderr, "failed writing response\n");
             }
@@ -144,7 +179,10 @@ void * process_client() {
           break;
         case OP_LIST:
           response = ems_list_events(resp_pipe_fd);
-          if (response) {
+          if (response == -1) {
+            fifo_is_open = 0;
+          }
+          if (response == 1) {
             if (write_arg(resp_pipe_fd, &response, sizeof(int))) {
               fprintf(stderr, "failed writing response\n");
             }
@@ -152,6 +190,7 @@ void * process_client() {
           break;
         default:
           fprintf(stderr, "Invalid op code: %c\n", op_code);
+          fifo_is_open = 0;
           break;
       }
     }
@@ -226,7 +265,7 @@ int main(int argc, char* argv[]) {
     char op_code;
 
     if (sigusr1_received) {
-      show_status(); // needs implementation
+    //  show_status();  needs implementation
     }
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
@@ -256,7 +295,9 @@ int main(int argc, char* argv[]) {
       }
 
       session_states[session_id] = ACTIVE;
-      session_id_queue[session_request_count] = session_id;
+      session_id_queue[prodptr] = session_id;
+      prodptr++;
+      if (prodptr == MAX_SESSION_COUNT) prodptr = 0;
       session_request_count++;
 
       if (read_pipe(server_pipe_fd, req_pipe_names[session_id], FIFO_NAME_SIZE)) {
