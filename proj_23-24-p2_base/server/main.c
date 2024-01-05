@@ -336,6 +336,7 @@ int main(int argc, char* argv[]) {
 
     if (sigusr1_received) {
       show_status();
+      sigusr1_received = 0;
     }
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
