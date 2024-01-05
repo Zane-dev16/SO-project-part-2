@@ -37,14 +37,13 @@ void sigusr1_handler() {
 }
 
 void * process_client() {
+  // ignores SIGUSR1 signal
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGUSR1);
+  pthread_sigmask(SIG_BLOCK, &mask, NULL);
   while (1) {
     int client_session_id;
-
-    // ignores SIGUSR1 signal
-    sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, SIGUSR1);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     if (pthread_mutex_lock(&mutex)) {
       fprintf(stderr, "Lock Error");
