@@ -145,7 +145,6 @@ void * process_client() {
       char op_code;
       ssize_t ret = read(req_pipe_fd, &op_code, sizeof(char));
       if (ret == 0) {
-        printf("client no longer accessible\n");
         break;
       }
       if (ret == -1) {
@@ -356,7 +355,7 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
       }
       while (active_session_count == MAX_SESSION_COUNT || session_request_count == MAX_SESSION_COUNT) {
-        if (pthread_cond_wait(&has_session_cond, &mutex)) {
+        if (pthread_cond_wait(&session_max_cond, &mutex)) {
           fprintf(stderr, "Condition Variable Error");
           exit(EXIT_FAILURE);
         }
