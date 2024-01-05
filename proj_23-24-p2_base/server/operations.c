@@ -200,15 +200,19 @@ int ems_show(int out_fd, unsigned int event_id) {
   }
   if (write_arg(out_fd, &response, sizeof(int))) {
     fprintf(stderr, "failed writing response\n");
+    return -1;
   }
   if (write_arg(out_fd, &event->rows, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed from show\n");
+    return -1;
   }
   if (write_arg(out_fd, &event->cols, sizeof(size_t))) {
     fprintf(stderr, "write to pipe failed from show\n");
+    return -1;
   }
   if (write_arg(out_fd, event->data, sizeof(unsigned int) * event->rows * event->cols)) {
     fprintf(stderr, "write to pipe failed from show\n");
+    return -1;
   }
   pthread_mutex_unlock(&event->mutex);
   return 0;
@@ -287,17 +291,18 @@ int ems_list_events(int out_fd) {
   }
   if (write_arg(out_fd, &response, sizeof(int))) {
     fprintf(stderr, "failed writing response\n");
+    return -1;
   }
   if (write_arg(out_fd, &num_events, sizeof(size_t))) {
       perror("Error writing num_events to file descriptor");
       pthread_rwlock_unlock(&event_list->rwl);
-      return 1;
+    return -1;
   }
   if (write_arg(out_fd, event_ids, num_events * sizeof(unsigned int))) {
     perror("Error writing event IDs to file descriptor");
     free(event_ids);
     pthread_rwlock_unlock(&event_list->rwl);
-    return 1;
+    return -1;
   }
 
   free(event_ids);
