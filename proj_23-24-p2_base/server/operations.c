@@ -339,28 +339,45 @@ int show_status() {
   }
 
   while (1) {
+    if (pthread_mutex_lock(&current->event->mutex) != 0) {
+      fprintf(stderr, "Error locking mutex\n");
+      exit(EXIT_FAILURE);
+    }
     char buff[] = "Event: ";
     if (fprintf(stdout, "%s", buff) == -1) {
       perror("Error writing to stdout");
+      pthread_mutex_unlock(&current->event->mutex);
       pthread_rwlock_unlock(&event_list->rwl);
       return 1;
     }
 
     char id[16];
-    sprintf(id, "%u\n", (current->event)->id);
+    if (sprintf(id, "%u\n", (current->event)->id) == -1) {
+      perror("Error writing to buffer");
+      pthread_mutex_unlock(&current->event->mutex);
+      pthread_rwlock_unlock(&event_list->rwl);
+      return 1;
+    }
     if (fprintf(stdout, "%s", id) == -1) {
       perror("Error writing to stdout");
+      pthread_mutex_unlock(&current->event->mutex);
       pthread_rwlock_unlock(&event_list->rwl);
       return 1;
     }
     for (size_t i = 1; i <= current->event->rows; i++) {
       for (size_t j = 1; j <= current->event->cols; j++) {
         char buffer[16];
-        sprintf(buffer, "%u", current->event->data[seat_index(current->event, i, j)]);
+        if (sprintf(buffer, "%u", current->event->data[seat_index(current->event, i, j)]) == -1) {
+          perror("Error writing to buffer");
+          pthread_mutex_unlock(&current->event->mutex);
+          pthread_rwlock_unlock(&event_list->rwl);
+          return 1;
+        }
 
         if (fprintf(stdout, "%s", buffer) == -1) {
           perror("Error writing to stdout");
           pthread_mutex_unlock(&current->event->mutex);
+          pthread_rwlock_unlock(&event_list->rwl);
           return 1;
         }
 
@@ -368,6 +385,7 @@ int show_status() {
           if (fprintf(stdout, " ") == -1) {
             perror("Error writing to stdout");
             pthread_mutex_unlock(&current->event->mutex);
+            pthread_rwlock_unlock(&event_list->rwl);
             return 1;
           }
         }
@@ -376,6 +394,7 @@ int show_status() {
     if (fprintf(stdout, "\n") == -1) {
       perror("Error writing to stdout");
       pthread_mutex_unlock(&current->event->mutex);
+      pthread_rwlock_unlock(&event_list->rwl);
       return 1;
     }
   }
@@ -383,10 +402,9 @@ int show_status() {
     if (current == to) {
       break;
     }
-
+    pthread_mutex_unlock(&current->event->mutex);
     current = current->next;
   }
-
   pthread_rwlock_unlock(&event_list->rwl);
   return 0;
 }
