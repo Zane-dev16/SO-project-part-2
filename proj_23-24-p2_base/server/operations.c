@@ -312,7 +312,6 @@ int ems_list_events(int out_fd) {
 }
 
 int show_status() {
-
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -323,18 +322,63 @@ int show_status() {
     return 1;
   }
 
-  struct ListNode* current = event_list->head;
   struct ListNode* to = event_list->tail;
+  struct ListNode* current = event_list->head;
 
-  while (1) {
-    unsigned int event_id = current->event->id;
-    
-    // Usando STDOUT_FILENO como o descritor de arquivo para o stdout
-    if (ems_show(STDOUT_FILENO, event_id)) {
-      fprintf(stderr, "Error showing event\n");
+
+  if (current == NULL) {
+    char buff[] = "No events\n";
+    if (fprintf(stdout, "%s", buff) == -1) {
+      perror("Error writing to stdout");
       pthread_rwlock_unlock(&event_list->rwl);
       return 1;
     }
+
+    pthread_rwlock_unlock(&event_list->rwl);
+    return 0;
+  }
+
+  while (1) {
+    char buff[] = "Event: ";
+    if (fprintf(stdout, "%s", buff) == -1) {
+      perror("Error writing to stdout");
+      pthread_rwlock_unlock(&event_list->rwl);
+      return 1;
+    }
+
+    char id[16];
+    sprintf(id, "%u\n", (current->event)->id);
+    if (fprintf(stdout, "%s", id) == -1) {
+      perror("Error writing to stdout");
+      pthread_rwlock_unlock(&event_list->rwl);
+      return 1;
+    }
+    for (size_t i = 1; i <= current->event->rows; i++) {
+      for (size_t j = 1; j <= current->event->cols; j++) {
+        char buffer[16];
+        sprintf(buffer, "%u", current->event->data[seat_index(current->event, i, j)]);
+
+        if (fprintf(stdout, "%s", buffer) == -1) {
+          perror("Error writing to stdout");
+          pthread_mutex_unlock(&current->event->mutex);
+          return 1;
+        }
+
+        if (j < current->event->cols) {
+          if (fprintf(stdout, " ") == -1) {
+            perror("Error writing to stdout");
+            pthread_mutex_unlock(&current->event->mutex);
+            return 1;
+          }
+        }
+      }
+
+    if (fprintf(stdout, "\n") == -1) {
+      perror("Error writing to stdout");
+      pthread_mutex_unlock(&current->event->mutex);
+      return 1;
+    }
+  }
 
     if (current == to) {
       break;
@@ -344,6 +388,5 @@ int show_status() {
   }
 
   pthread_rwlock_unlock(&event_list->rwl);
-
   return 0;
 }
