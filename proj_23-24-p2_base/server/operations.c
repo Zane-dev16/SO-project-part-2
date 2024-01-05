@@ -307,6 +307,38 @@ int ems_list_events(int out_fd) {
 }
 
 int show_status() {
-  // implementar a escrita para o std_out do estado atual do programa
+
+  if (event_list == NULL) {
+    fprintf(stderr, "EMS state must be initialized\n");
+    return 1;
+  }
+
+  if (pthread_rwlock_rdlock(&event_list->rwl) != 0) {
+    fprintf(stderr, "Error locking list rwl\n");
+    return 1;
+  }
+
+  struct ListNode* current = event_list->head;
+  struct ListNode* to = event_list->tail;
+
+  while (1) {
+    unsigned int event_id = current->event->id;
+    
+    // Usando STDOUT_FILENO como o descritor de arquivo para o stdout
+    if (ems_show(STDOUT_FILENO, event_id)) {
+      fprintf(stderr, "Error showing event\n");
+      pthread_rwlock_unlock(&event_list->rwl);
+      return 1;
+    }
+
+    if (current == to) {
+      break;
+    }
+
+    current = current->next;
+  }
+
+  pthread_rwlock_unlock(&event_list->rwl);
+
   return 0;
 }

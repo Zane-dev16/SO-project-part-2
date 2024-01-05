@@ -37,4 +37,8 @@ int ems_show(int out_fd, unsigned int event_id);
 /// @return 0 if the events were printed successfully, 1 otherwise.
 int ems_list_events(int out_fd);
 
+/// Prints overall status of all the events.
+/// @return 0 if the information were printed successfully, 1 otherwise.
+int show_status();
+
 #endif  // SERVER_OPERATIONS_H

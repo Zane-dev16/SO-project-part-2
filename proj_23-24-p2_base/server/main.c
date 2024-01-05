@@ -234,12 +234,10 @@ int main(int argc, char* argv[]) {
       continue;
     }
     if (bytes_read == -1) {
-      /*
+      // check SIGNAL
       if (errno == EINTR) {
-        // show_status
-        // continue
+        continue;
       }
-      */
       fprintf(stderr, "read failed\n");
       exit(EXIT_FAILURE);
     }
