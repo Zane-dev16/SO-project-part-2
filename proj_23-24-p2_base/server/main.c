@@ -20,6 +20,8 @@
 char req_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 char resp_pipe_names[FIFO_NAME_SIZE][MAX_SESSION_COUNT];
 int session_id_queue[MAX_SESSION_COUNT];
+int consptr = 0;
+int prodptr = 0;
 int active_session_count = 0;
 int session_request_count = 0;
 int session_states[MAX_SESSION_COUNT];
@@ -46,7 +48,9 @@ void * process_client() {
 
     pthread_mutex_lock(&mutex);
     while (session_request_count == 0) pthread_cond_wait(&has_session_cond, &mutex);
-    int session_id = session_id_queue[session_request_count - 1];
+    int session_id = session_id_queue[consptr]; 
+    consptr++; 
+    if (consptr == MAX_SESSION_COUNT) consptr = 0;
     session_request_count--;
     active_session_count++;
     pthread_mutex_unlock(&mutex);
@@ -226,7 +230,7 @@ int main(int argc, char* argv[]) {
     char op_code;
 
     if (sigusr1_received) {
-      show_status(); // needs implementation
+    //  show_status();  needs implementation
     }
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
@@ -258,7 +262,9 @@ int main(int argc, char* argv[]) {
       }
 
       session_states[session_id] = ACTIVE;
-      session_id_queue[session_request_count] = session_id;
+      session_id_queue[prodptr] = session_id;
+      prodptr++;
+      if (prodptr == MAX_SESSION_COUNT) prodptr = 0;
       session_request_count++;
 
       if (read_pipe(server_pipe_fd, req_pipe_names[session_id], FIFO_NAME_SIZE)) {
