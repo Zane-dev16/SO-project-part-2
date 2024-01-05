@@ -265,14 +265,12 @@ int main(int argc, char* argv[]) {
     char op_code;
 
     if (sigusr1_received) {
-    //  show_status();  needs implementation
+      show_status();
     }
 
     ssize_t bytes_read = read(server_pipe_fd, &op_code, sizeof(char));
-    if (bytes_read == 0) {
-      continue;
-    }
-    if (bytes_read == -1) {
+
+    if (bytes_read <= 0) {
       // check SIGNAL
       if (errno == EINTR) {
         continue;
